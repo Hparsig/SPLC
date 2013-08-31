@@ -1,3 +1,8 @@
+/* Author Michael Jespersen
+ * Date : 30 august 2013
+ * Time : 14:00
+ */
+
 using System;
 using SPLC.week1;
 
@@ -9,7 +14,7 @@ public class Test{
 		System.Console.WriteLine("Sum : " + threePlusFour.Eval());
 		IExpression myExpression = new Product(new Constant(2), threePlusFour);
 		System.Console.WriteLine("Product : " + myExpression.Eval());
-
+    System.Console.WriteLine( myExpression.ToString() );
 	}
 
 }

@@ -7,12 +7,16 @@ using System;
 
 namespace SPLC.week1{
 
-	public class Constant  IExpression{
+	public class Constant : IExpression{
 
+    double val=0;					
+					
 		public Constant(double val){
 			this.val = val;
 		}
 	
 		public double Eval(){ return val; }
+		
+		public override string ToString(){ return val.ToString(); }
 	}
 }
