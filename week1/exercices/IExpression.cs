@@ -6,8 +6,8 @@
 using System;
 
 namespace SPLC.week1{
-  
-  public interface IExpression{
+
+	public interface IExpression{
 		double Eval();
 	}
 

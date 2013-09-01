@@ -9,7 +9,7 @@ namespace SPLC.week1{
 
 	public class Constant : IExpression{
 
-    double val=0;					
+		double val=0;
 					
 		public Constant(double val){
 			this.val = val;
