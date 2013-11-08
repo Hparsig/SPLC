@@ -169,6 +169,56 @@ namespace Expressions {
     }
   }
 
+  public class LetExpr : Expression {
+
+    private readonly string name;
+    private readonly Expression e1, e2;
+
+    public LetExpr(string name, Expression e1, Expression e2){
+      this.name = name;
+      this.e1 = e1;
+      this.e2 = e2;
+    }
+
+    public override int Eval(REnv env, FEnv fEnv){
+
+      // env is of type REnv (Interpreting) which implements methods
+      // to manipulate the stack
+
+      // evaluate e1 (int)
+      int val = e1.Eval( env, fEnv );
+      // push type binding of t1 to 'name' onto stack
+      env.AllocateLocal( name );
+      // Push binding of variable to value to symbol table
+      env.GetVariable( name ).value = val;
+
+      // evalute e2 (Expr)
+      int r = e2.Eval( env, fEnv);
+      // pop binding from stack
+      env.PopEnv();
+      // now type of expression is t2
+      return r;
+    }
+
+    public override Type Check(TEnv env, FEnv fEnv) {
+      // Find type t1 of e1
+      Type t1 = e1.Check(env, fEnv);
+      // Push type binding of t1 to x onto stack
+      env.DeclareLocal( name, t1 );
+      // Find type t2 of e2 
+      Type t2 = e2.Check( env, fEnv );
+      // Pop binding from stack
+      env.PopEnv();
+      // Now type of expression is t2
+      return t2;
+    }
+
+    public override void Compile(CEnv env, Generator gen){
+      throw new Exception("Not implemented yet");
+    }
+
+  }
+
   public class Constant : Expression {
     private readonly int value;
     private readonly Type type;

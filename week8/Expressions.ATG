@@ -32,14 +32,14 @@ Program<out Program p>     (. p = null; FuncDef f = null; String name = null; Ex
 = {
 	FuncDef<out f, out name>  (. functions.Add(name, f); .)
    }
-   IfElseExpr<out e> (. p = new Program(functions, e); .)
+   MainExpr<out e> (. p = new Program(functions, e); .)
 .
 
 FuncDef<out FuncDef f, out String name> (. f = null; String an = null; Expression e = null;
                                                                                Type at = null; Type rt = null;.)
 = TypeExpr<out rt> Ident<out name> '(' 
        TypeExpr<out at> Ident<out an> ')' '=' 
-       IfElseExpr<out e>  ';'                                           (. f = new FuncDef(rt, name, at, an, e); .)
+       MainExpr<out e>  ';'                                           (. f = new FuncDef(rt, name, at, an, e); .)
 .
 
 /*------------------------------------------------------------------------*/
@@ -52,11 +52,28 @@ TypeExpr<out Type t>  (. t = null; .)
 .
 
 /*------------------------------------------------------------------------*/
+MainExpr<out Expression e>            (. Expression e1; e = null; .)
+= IfElseExpr <out e1>                 (. e = e1; .)
+| InnerExpr<out e1>                   (. e = e1; .)
+.
+
+/*------------------------------------------------------------------------*/
+InnerExpr<out Expression e>           (. Expression e1; e = null; .)
+= Expr<out e1>                        (. e = e1; .)
+| LetExpr<out e1>                     (. e = e1; .)
+.
+
+/*------------------------------------------------------------------------*/
 IfElseExpr<out Expression e>          (. Expression e1, e2, e3; e = null; .)
 = "if"    Expr<out e1> 
   "then"  Expr<out e2>
   "else"  Expr<out e3>                (. e = new IfElseExpr(e1, e2, e3); .)
-| LetExpr<out e1>                     (. e = e1; .)
+.
+
+/*------------------------------------------------------------------------*/
+LetExpr<out Expression e>             (. Expression e1, e2; string name; e = null; .)
+= "let"   Ident<out name> "=" Expr<out e1>
+  "in"    InnerExpr<out e2> "end"     (. e = new LetExpr(name, e1, e2); .)
 .
 
 /*------------------------------------------------------------------------*/
@@ -88,15 +105,8 @@ OrOp<out Operator op>                 (. op = Operator.Bad; .)
 SimBoolExpr<out Expression e>         (. Expression e1, e2; Operator op; e = null; .)
 = SimExpr<out e1>                     (. e = e1; .)
   [ RelOp<out op>
-    LetExpr<out e2>                   (. e = new BinOp(op, e, e2); .)
+    SimExpr<out e2>                   (. e = new BinOp(op, e, e2); .)
   ]
-.
-
-/*------------------------------------------------------------------------*/
-LetExpr<out Expression e>             (. Expression e1, e2; string name; e = null; .)
-= "let"   Ident<out name> "=" Expr<out e1>
-  "in"    Expr<out e2> "end"          (. e = new LetExpr(name, e1, e2); .)
-| SimExpr<out e1>                     (. e = e1; .)
 .
 
 /*------------------------------------------------------------------------*/
