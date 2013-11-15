@@ -85,50 +85,90 @@ namespace Expressions {
 	}
   }
 
-// Abstract syntax for function definitions. 
+// Abstract syntax for function definitions.
 	
   public class FuncDef {
 	private readonly String fName;
-	private readonly Pair<String,Type> formArg; 
+	private readonly List<Pair<String,Type>> args;
 	private readonly Expression body;
 	public  readonly Type returnType;
 		
-	public FuncDef(Type returnType, String fName, Type argType, String argName, Expression body) {
-	  this.formArg = new Pair<string, Type>(argName, argType); 
-	  this.body = body; this.returnType = returnType;
+	public FuncDef(Type returnType, String fName, List<Pair<string, Type>> args, Expression body) {
+    this.args = args;
+	  this.body = body; 
+    this.returnType = returnType;
 	  this.fName = fName;
 	}
 		
 	public void Check (TEnv env, FEnv fEnv) {
-	  env.DeclareLocal(formArg.Fst, formArg.Snd);
+
+    foreach (Pair<string, Type> pair in args) {
+      env.DeclareLocal(pair.Fst, pair.Snd);
+    }
+
 	  Type t = body.Check(env, fEnv);
-	  env.PopEnv();
-	  if(t != returnType)  
-	    throw new TypeException("Body of " + fName + " returns " + t + ", " + returnType + " expected");
-	}
-	
-	public int Eval(REnv env, FEnv fenv, int arg) {
-      env.AllocateLocal(formArg.Fst);
-	  env.GetVariable(formArg.Fst).value = arg;
-	  int v = body.Eval(env, fenv);
-      env.PopEnv();
-	  return v;	  
-	}
-		
-    public void Compile(Generator gen, CEnv env) {
-      env.DeclareLocal(formArg.Fst); // Formal argument name points to top of stack
-	  gen.Label(env.getFunctionLabel(fName));
-	  body.Compile(env, gen);
-      gen.Emit(new RET(1));		
-	}
-			
-	public bool CheckArgType(Type argType) {
-	  if(argType != formArg.Snd) 
-	    return false;
-	  return true;
-	}
+
+    foreach (Pair<string, Type> pair in args) {
+	    env.PopEnv();
+    }
+
+    if(t != returnType)
+      throw new TypeException("Body of " + fName + " returns " + t + ", " + returnType + " expected");
   }
-	
+
+  public int Eval(REnv env, FEnv fenv, int[] values) {
+
+    if(args.Count > 0){
+      int i = 0;
+
+      foreach (Pair<string, Type> pair in args) {
+        env.AllocateLocal(pair.Fst);
+        env.GetVariable(pair.Fst).value = values[i++];
+      }
+
+      int v = body.Eval(env, fenv);
+
+      foreach (Pair<string, Type> pair in args) env.PopEnv();
+
+      return v;
+
+    } else {
+      int v = body.Eval(env, fenv);
+      return v;
+    }
+  }
+
+    public void Compile(Generator gen, CEnv env) {
+      throw new Exception("Not implemented yet");
+      /*env.DeclareLocal(formArg.Fst); // Formal argument name points to top of stack
+      gen.Label(env.getFunctionLabel(fName));
+      body.Compile(env, gen);
+      gen.Emit(new RET(1));*/
+    }
+
+    public bool CheckArgTypes(Type[] argTypes) {
+      if(args.Count != argTypes.Length) {
+        string message =
+        string.Format("Method with {0} args invoked with {1} param", args.Count, argTypes.Length);
+        throw new Exception(message);
+      }
+
+      Type formalArg;
+      int i = 0;
+
+      foreach (Pair<string, Type> pair in args) {
+        formalArg = pair.Snd;
+        if (formalArg != argTypes[i++])
+          return false;
+      }
+      return true;
+    }
+
+    public bool CheckArgType(Type argType) {
+      throw new Exception("Not implemented!");
+    }
+  }
+
   // Expression abstract syntax
 
   public abstract class Expression {
@@ -463,36 +503,53 @@ namespace Expressions {
 // Abstract syntax for a function call expression	
 
   public class FuncCall : Expression {
-	private readonly String fName;
-	private readonly Expression arg;
-		
-	public FuncCall(String fName, Expression arg) {
-	  this.fName = fName; this.arg = arg;
-	}
-		
-	public override Type Check(TEnv env, FEnv fenv) {
-	  Type argType = arg.Check(env,fenv);
-	  FuncDef fDef = fenv.getFunction(fName);
-	  if (fDef.CheckArgType(argType))
-		return fDef.returnType;
-	  else 
-		throw new TypeException("Type error in call of function " + fName);
-	}
-		
-	public override int Eval(REnv env, FEnv fenv) {
-      int argValue = arg.Eval(env, fenv);
-	  FuncDef fDef = fenv.getFunction(fName);
-	  return fDef.Eval(env, fenv, argValue);
-	}
-		
-	public override void Compile(CEnv env, Generator gen) {
-	  arg.Compile (env, gen);
-	  String fLabel = env.getFunctionLabel(fName);
-	  gen.Emit(new CALL(1, fLabel));
-	}
+    private readonly String fName;
+    private readonly List<Expression> args;
+
+    public FuncCall(String fName, List<Expression> args) {
+      this.fName = fName; 
+      this.args = args;
+    }
+
+    public override Type Check(TEnv env, FEnv fenv) {
+      Type[] paramTypes = new Type[args.Count];
+      int i = 0;
+
+      FuncDef fDef = fenv.getFunction(fName);
+
+      foreach (Expression expression in args) {
+        paramTypes[i++] = expression.Check(env, fenv);
+      }
+
+      if (fDef.CheckArgTypes(paramTypes))
+        return fDef.returnType;
+      else
+        throw new TypeException("Type error in call of function " + fName);
+    }
+
+    public override int Eval(REnv env, FEnv fenv) {
+      int[] values;
+      if(args.Count > 0){
+        values = new int[args.Count];
+        int i = 0;
+        foreach (Expression e in args) {
+          values[i++] = e.Eval(env, fenv);
+        }
+      }
+      else {
+          values = new int[0];
+      }
+      FuncDef fDef = fenv.getFunction(fName);
+      return fDef.Eval(env, fenv, values);
+    }
+
+    public override void Compile(CEnv env, Generator gen) {
+      /*arg.Compile (env, gen);
+      String fLabel = env.getFunctionLabel(fName);
+      gen.Emit(new CALL(1, fLabel));*/
+      throw new Exception("not implemented");
+    }
   }
-
-
 
 // Function environment. Keeps track of the functions defined in a given context. 
 	

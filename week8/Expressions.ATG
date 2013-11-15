@@ -7,6 +7,13 @@
 
 using System.Collections.Generic;
 
+// Coco/R does not deal well with generics in arguments to nonterminals.
+// allows us to use the names ListFormalArgs and ListExpr as abbreviation for List<Pair<String, Type>> and List<Expression> in our parser specification
+using ListFormalArgs =
+System.Collections.Generic.List<Expressions.Pair<System.String, Expressions.Type>>;
+using ListExpr = System.Collections.Generic.List<Expressions.Expression>;
+using ArgPair = Expressions.Pair<System.String, Expressions.Type>;
+
 COMPILER Expressions
   public Program program;
 
@@ -27,40 +34,62 @@ IGNORE cr + lf + tab
 PRODUCTIONS
 
 /*------------------------------------------------------------------------*/
-Program<out Program p>     (. p = null; FuncDef f = null; String name = null; Expression e = null;
-                                   Dictionary<String,FuncDef> functions = new Dictionary<string, FuncDef>(); .)
+Program<out Program p>(.
+    p = null;
+    FuncDef f = null;
+    String name = null;
+    Expression e = null;
+    Dictionary<String,FuncDef> functions = new Dictionary<string, FuncDef>();
+.)
+
 = {
-	FuncDef<out f, out name>  (. functions.Add(name, f); .)
-   }
-   MainExpr<out e> (. p = new Program(functions, e); .)
+  FuncDef<out f, out name>            (. functions.Add(name, f); .)
+  }
+
+  MainExpr<out e>                     (. p = new Program(functions, e); .)
 .
 
-FuncDef<out FuncDef f, out String name> (. f = null; String an = null; Expression e = null;
-                                                                               Type at = null; Type rt = null;.)
-= TypeExpr<out rt> Ident<out name> '(' 
-       TypeExpr<out at> Ident<out an> ')' '=' 
-       MainExpr<out e>  ';'                                           (. f = new FuncDef(rt, name, at, an, e); .)
+/*------------------------------------------------------------------------*/
+FuncDef<out FuncDef f, out String name>(.
+  f = null;
+  Expression e = null;
+  Type rt = null;
+  ListFormalArgs list;
+  ListFormalArgs argList = new List<Pair<string, Type>>();
+.)
+
+= TypeExpr<out rt> Ident<out name> '('
+  [
+    Args<out list>                    (. argList = list; .)
+  ]
+  ')' '='
+       MainExpr<out e>  ';'           (. f = new FuncDef(rt, name, argList, e); .)
 .
 
 /*------------------------------------------------------------------------*/
 
+Args<out ListFormalArgs list>         (. string an; Type at; .)
+= TypeExpr<out at> Ident<out an>(.
+  list = new List<Pair<string, Type>>();
+  list.Add(new Pair<string, Type>(an, at));
+.)
+{
+  ','TypeExpr<out at> Ident<out an>  (. list.Add(new Pair<string, Type>(an, at)); .)
+}
+.
 
 /*------------------------------------------------------------------------*/
-TypeExpr<out Type t>  (. t = null; .)
-= "int"    (. t = Type.intType; .)
-| "bool"  (. t = Type.boolType; .)
+
+TypeExpr<out Type t>                  (. t = null; .)
+= "int"                               (. t = Type.intType; .)
+| "bool"                              (. t = Type.boolType; .)
 .
 
 /*------------------------------------------------------------------------*/
 MainExpr<out Expression e>            (. Expression e1; e = null; .)
 = IfElseExpr <out e1>                 (. e = e1; .)
-| InnerExpr<out e1>                   (. e = e1; .)
-.
-
-/*------------------------------------------------------------------------*/
-InnerExpr<out Expression e>           (. Expression e1; e = null; .)
-= Expr<out e1>                        (. e = e1; .)
 | LetExpr<out e1>                     (. e = e1; .)
+| Expr<out e1>                        (. e = e1; .)
 .
 
 /*------------------------------------------------------------------------*/
@@ -75,6 +104,13 @@ LetExpr<out Expression e>             (. Expression e1, e2; string name; e = nul
 = "let"   Ident<out name> "=" Expr<out e1>
   "in"    InnerExpr<out e2> "end"     (. e = new LetExpr(name, e1, e2); .)
 .
+
+/*------------------------------------------------------------------------*/
+InnerExpr<out Expression e>           (. Expression e1; e = null; .)
+= Expr<out e1>                        (. e = e1; .)
+| LetExpr<out e1>                     (. e = e1; .)
+.
+
 
 /*------------------------------------------------------------------------*/
 Expr<out Expression e>                (. Expression e1, e2; Operator op; e = null; .)
@@ -144,6 +180,7 @@ AddOp<out Operator op>                (. op = Operator.Bad; .)
 .
 
 /*------------------------------------------------------------------------*/
+/*
 Factor<out Expression e>              (. String name; Expression e1; e = null; .)
 = ( Ident<out name>                   (. e = new Variable(name); .)
      [ 
@@ -154,6 +191,35 @@ Factor<out Expression e>              (. String name; Expression e1; e = null; .
   | '-' Factor<out e1>                (. e = new UnOp(Operator.Neg, e1); .)
   | '(' Expr<out e1> ')'              (. e = e1; .)
   )
+.
+*/
+
+/*------------------------------------------------------------------------*/
+Factor<out Expression e>
+(.
+  String name;
+  Expression e1;
+  e = null;
+  ListExpr list = new List<Expression>();
+.)
+
+= ( Ident<out name>                   (. e = new Variable(name); .)
+    [
+      '(' [Params<out list>] ')'      (. e = new FuncCall(name, list); .)
+    ]
+  | number                            (. e = new Constant(Convert.ToInt32(t.val),
+                                         Type.intType); .)
+  | '-' Factor<out e1>                (. e = new UnOp(Operator.Neg, e1); .)
+  | '(' MainExpr<out e1> ')'              (. e = e1; .)
+  )
+.
+
+/*------------------------------------------------------------------------*/
+Params<out ListExpr list>             (. Expression e1, e2; list = null; .)
+= Expr<out e1>                        (. list = new List<Expression>(); list.Add(e1); .)
+  {
+    ','Expr<out e2>                   (. list.Add(e2); .)
+  }
 .
 
 /*------------------------------------------------------------------------*/
